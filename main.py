@@ -50,28 +50,27 @@ def execute_code(request: CodeRequest):
     start_time = time.time()
     
     try:
-        # Create sandbox with timeout
-        sandbox = Sandbox(template=template_id, timeout=request.timeout + 10)
-        
-        # Execute code
-        result = sandbox.run_code(request.code)
-        
-        execution_time = time.time() - start_time
-        
-        # Process results
-        output_lines = []
-        if result.logs.stdout:
-            output_lines.extend(result.logs.stdout)
-        if result.logs.stderr:
-            output_lines.extend([f"STDERR: {line}" for line in result.logs.stderr])
-        
-        output = "\n".join(output_lines) if output_lines else "Code executed successfully (no output)"
-        
-        return CodeResponse(
-            success=True,
-            output=output,
-            execution_time=execution_time
-        )
+        # Create sandbox with context manager (no template - use default)
+        with Sandbox() as sandbox:
+            # Execute code
+            result = sandbox.run_code(request.code)
+            
+            execution_time = time.time() - start_time
+            
+            # Process results
+            output_lines = []
+            if result.logs.stdout:
+                output_lines.extend(result.logs.stdout)
+            if result.logs.stderr:
+                output_lines.extend([f"STDERR: {line}" for line in result.logs.stderr])
+            
+            output = "\n".join(output_lines) if output_lines else "Code executed successfully (no output)"
+            
+            return CodeResponse(
+                success=True,
+                output=output,
+                execution_time=execution_time
+            )
         
     except Exception as e:
         execution_time = time.time() - start_time
