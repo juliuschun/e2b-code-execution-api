@@ -50,8 +50,8 @@ def execute_code(request: CodeRequest):
     start_time = time.time()
     
     try:
-        # Create sandbox (simple initialization)
-        sandbox = Sandbox(template=template_id)
+        # Create sandbox with timeout
+        sandbox = Sandbox(template=template_id, timeout=request.timeout + 10)
         
         # Execute code
         result = sandbox.run_code(request.code)
