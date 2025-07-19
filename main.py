@@ -50,29 +50,27 @@ async def execute_code(request: CodeRequest):
     start_time = asyncio.get_event_loop().time()
     
     try:
-        # Create sandbox
-        sandbox = Sandbox(template=template_id, timeout=request.timeout + 10)
-        await sandbox.open()
-        
-        # Execute code
-        result = await sandbox.run_code(request.code, timeout=request.timeout)
-        
-        execution_time = asyncio.get_event_loop().time() - start_time
-        
-        # Process results
-        output_lines = []
-        if result.logs.stdout:
-            output_lines.extend(result.logs.stdout)
-        if result.logs.stderr:
-            output_lines.extend([f"STDERR: {line}" for line in result.logs.stderr])
-        
-        output = "\n".join(output_lines) if output_lines else "Code executed successfully (no output)"
-        
-        return CodeResponse(
-            success=True,
-            output=output,
-            execution_time=execution_time
-        )
+        # Create sandbox (async context manager)
+        async with Sandbox(template=template_id, timeout=request.timeout + 10) as sandbox:
+            # Execute code
+            result = await sandbox.run_code(request.code, timeout=request.timeout)
+            
+            execution_time = asyncio.get_event_loop().time() - start_time
+            
+            # Process results
+            output_lines = []
+            if result.logs.stdout:
+                output_lines.extend(result.logs.stdout)
+            if result.logs.stderr:
+                output_lines.extend([f"STDERR: {line}" for line in result.logs.stderr])
+            
+            output = "\n".join(output_lines) if output_lines else "Code executed successfully (no output)"
+            
+            return CodeResponse(
+                success=True,
+                output=output,
+                execution_time=execution_time
+            )
         
     except Exception as e:
         execution_time = asyncio.get_event_loop().time() - start_time
@@ -82,13 +80,6 @@ async def execute_code(request: CodeRequest):
             error=str(e),
             execution_time=execution_time
         )
-        
-    finally:
-        if sandbox:
-            try:
-                await sandbox.close()
-            except:
-                pass
 
 @app.get("/")
 async def root():
