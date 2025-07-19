@@ -1,10 +1,10 @@
 """
-E2B Code Execution API
+E2B Code Execution API (Sync version for App Engine)
 FastAPI service that executes Python code in E2B sandboxes
 """
 
 import os
-import asyncio
+import time
 import json
 from typing import Optional
 from fastapi import FastAPI, HTTPException
@@ -32,13 +32,13 @@ class CodeResponse(BaseModel):
     execution_time: Optional[float] = None
 
 @app.get("/health")
-async def health_check():
+def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "e2b-code-execution-api"}
 
 @app.post("/execute", response_model=CodeResponse)
-async def execute_code(request: CodeRequest):
-    """Execute Python code in E2B sandbox"""
+def execute_code(request: CodeRequest):
+    """Execute Python code in E2B sandbox (synchronous version)"""
     
     e2b_api_key = os.getenv("E2B_API_KEY")
     if not e2b_api_key:
@@ -47,17 +47,16 @@ async def execute_code(request: CodeRequest):
     template_id = os.getenv("E2B_TEMPLATE_ID", "genapi")
     
     sandbox = None
-    start_time = asyncio.get_event_loop().time()
+    start_time = time.time()
     
     try:
-        # Create sandbox
+        # Create sandbox (synchronous)
         sandbox = Sandbox(template=template_id, timeout=request.timeout + 10)
-        await sandbox.open()
         
-        # Execute code
-        result = await sandbox.run_code(request.code, timeout=request.timeout)
+        # Execute code (synchronous)
+        result = sandbox.run_code(request.code, timeout=request.timeout)
         
-        execution_time = asyncio.get_event_loop().time() - start_time
+        execution_time = time.time() - start_time
         
         # Process results
         output_lines = []
@@ -75,7 +74,7 @@ async def execute_code(request: CodeRequest):
         )
         
     except Exception as e:
-        execution_time = asyncio.get_event_loop().time() - start_time
+        execution_time = time.time() - start_time
         return CodeResponse(
             success=False,
             output="",
@@ -85,10 +84,10 @@ async def execute_code(request: CodeRequest):
         
     finally:
         if sandbox and sandbox.is_open:
-            await sandbox.close()
+            sandbox.close()
 
 @app.get("/")
-async def root():
+def root():
     """Root endpoint with API information"""
     return {
         "service": "E2B Code Execution API",
@@ -99,13 +98,6 @@ async def root():
         },
         "template": os.getenv("E2B_TEMPLATE_ID", "genapi")
     }
-
-# ASGI application for App Engine
-from fastapi.middleware.wsgi import WSGIMiddleware
-
-# Create WSGI wrapper for App Engine compatibility
-def create_app():
-    return app
 
 if __name__ == "__main__":
     import uvicorn
