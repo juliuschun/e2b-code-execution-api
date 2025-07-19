@@ -38,7 +38,7 @@ async def health_check():
 
 @app.post("/execute", response_model=CodeResponse)
 def execute_code(request: CodeRequest):
-    """Execute Python code in E2B sandbox"""
+    """Execute Python code in E2B sandbox with fallback mechanism"""
     
     e2b_api_key = os.getenv("E2B_API_KEY")
     if not e2b_api_key:
@@ -46,14 +46,43 @@ def execute_code(request: CodeRequest):
     
     template_id = os.getenv("E2B_TEMPLATE_ID", "genapi")
     
-    sandbox = None
     start_time = time.time()
     
-    try:
-        # Create sandbox with context manager (no template - use default)
-        with Sandbox() as sandbox:
-            # Execute code
-            result = sandbox.run_code(request.code)
+    # Try custom template first, fallback to default
+    templates_to_try = [
+        ("lnmzb0eecin3qojbvl9j", "custom template with uv"),
+        ("genapi", "custom template by name"), 
+        (None, "default template")
+    ]
+    
+    for template, description in templates_to_try:
+        try:
+            if template:
+                with Sandbox(template=template) as sandbox:
+                    # Custom template should have uv pre-installed
+                    result = sandbox.run_code(request.code)
+            else:
+                with Sandbox() as sandbox:
+                    # Install uv in default template if needed
+                    enhanced_code = f"""
+# Check if uv is available, install if not
+import subprocess
+import sys
+
+try:
+    subprocess.run(["uv", "--version"], check=True, capture_output=True)
+    print("✅ uv is available")
+    uv_available = True
+except (subprocess.CalledProcessError, FileNotFoundError):
+    print("📦 Installing uv...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "uv"], check=True)
+    print("✅ uv installed successfully")
+    uv_available = True
+
+# Execute user code
+{request.code}
+"""
+                    result = sandbox.run_code(enhanced_code)
             
             execution_time = time.time() - start_time
             
@@ -66,20 +95,27 @@ def execute_code(request: CodeRequest):
             
             output = "\n".join(output_lines) if output_lines else "Code executed successfully (no output)"
             
+            # Add template info to output
+            template_info = f" (using {description})" if template else " (using default template with uv)"
+            
             return CodeResponse(
                 success=True,
-                output=output,
+                output=output + template_info,
                 execution_time=execution_time
             )
-        
-    except Exception as e:
-        execution_time = time.time() - start_time
-        return CodeResponse(
-            success=False,
-            output="",
-            error=str(e),
-            execution_time=execution_time
-        )
+            
+        except Exception as e:
+            # If this is not the last template, continue to next
+            if template != templates_to_try[-1][0]:
+                continue
+            # If this is the last template, return error
+            execution_time = time.time() - start_time
+            return CodeResponse(
+                success=False,
+                output="",
+                error=f"All templates failed. Last error: {str(e)}",
+                execution_time=execution_time
+            )
 
 @app.get("/")
 async def root():
