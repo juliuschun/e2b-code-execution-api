@@ -50,21 +50,33 @@ def execute_code(request: CodeRequest):
     
     # Try custom template first, fallback to default
     templates_to_try = [
-        ("lnmzb0eecin3qojbvl9j", "custom template with uv"),
-        ("genapi", "custom template by name"), 
-        (None, "default template")
+        (template_id, "custom template"),
+        (None, "default template with uv")
     ]
+    
+    attempted_templates = []
     
     for template, description in templates_to_try:
         try:
+            attempted_templates.append(f"🔄 {description}")
+            print(f"🔄 Trying template: {template} ({description})")
             if template:
                 with Sandbox(template=template) as sandbox:
                     # Custom template should have uv pre-installed
-                    result = sandbox.run_code(request.code)
+                    enhanced_code = f"""
+print("🎯 Using custom template: {template}")
+print("📍 Template: {description}")
+{request.code}
+"""
+                    result = sandbox.run_code(enhanced_code)
             else:
                 with Sandbox() as sandbox:
+                    print("🎯 Using default template")
                     # Install uv in default template if needed
                     enhanced_code = f"""
+print("🎯 Using default template")
+print("📍 Installing uv if needed...")
+
 # Check if uv is available, install if not
 import subprocess
 import sys
@@ -96,17 +108,21 @@ except (subprocess.CalledProcessError, FileNotFoundError):
             output = "\n".join(output_lines) if output_lines else "Code executed successfully (no output)"
             
             # Add template info to output
-            template_info = f" (using {description})" if template else " (using default template with uv)"
+            template_info = f" (using {description})"
+            attempt_info = f"\n\n📋 Templates attempted: {' → '.join(attempted_templates)}"
             
             return CodeResponse(
                 success=True,
-                output=output + template_info,
+                output=output + template_info + attempt_info,
                 execution_time=execution_time
             )
             
         except Exception as e:
+            attempted_templates.append(f"❌ {description} (failed: {str(e)[:50]}...)")
+            print(f"❌ Template {template} failed: {str(e)[:100]}...")
             # If this is not the last template, continue to next
             if template != templates_to_try[-1][0]:
+                print(f"🔄 Falling back to next template...")
                 continue
             # If this is the last template, return error
             execution_time = time.time() - start_time
