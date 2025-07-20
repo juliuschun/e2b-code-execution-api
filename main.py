@@ -44,13 +44,12 @@ def execute_code(request: CodeRequest):
     if not e2b_api_key:
         raise HTTPException(status_code=500, detail="E2B_API_KEY not configured")
     
-    template_id = os.getenv("E2B_TEMPLATE_ID", "genapi")
+    template_id = os.getenv("E2B_TEMPLATE_ID", "lnmzb0eecin3qojbvl9j")
     
     start_time = time.time()
     
-    # Try custom template first, fallback to default
+    # Use default template with uv for inline dependencies support
     templates_to_try = [
-        (template_id, "custom template"),
         (None, "default template with uv")
     ]
     
@@ -155,4 +154,5 @@ def create_app():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    port = int(os.getenv("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
