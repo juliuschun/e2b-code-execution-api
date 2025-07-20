@@ -21,6 +21,12 @@ jobs:
     - name: 'Set up Cloud SDK'
       uses: 'google-github-actions/setup-gcloud@v1'
     
-    - name: 'Deploy to App Engine'
+    - name: 'Deploy to Cloud Run'
       run: |
-        gcloud app deploy --quiet --project=${{ secrets.GCP_PROJECT_ID }}
+        gcloud run deploy e2b-code-execution-api \
+          --source . \
+          --platform managed \
+          --region asia-northeast3 \
+          --allow-unauthenticated \
+          --set-env-vars="E2B_API_KEY=${{ secrets.E2B_API_KEY }}" \
+          --project=${{ secrets.GCP_PROJECT_ID }}
