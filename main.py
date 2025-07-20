@@ -1,11 +1,10 @@
 """
-E2B Code Execution API
-FastAPI service that executes Python code in E2B sandboxes
+E2B Code Execution API - Clean Version
+FastAPI service that executes Python code in E2B sandboxes using default template only
 """
 
 import os
 import time
-import json
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -16,9 +15,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(
-    title="E2B Code Execution API",
-    description="Execute Python code safely in E2B sandboxes",
-    version="1.0.0"
+    title="E2B Code Execution API - Clean",
+    description="Execute Python code safely in E2B sandboxes (default template only)",
+    version="2.0.0"
 )
 
 class CodeRequest(BaseModel):
@@ -34,123 +33,91 @@ class CodeResponse(BaseModel):
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "e2b-code-execution-api"}
+    return {"status": "healthy", "service": "e2b-api-clean"}
 
 @app.post("/execute", response_model=CodeResponse)
 def execute_code(request: CodeRequest):
-    """Execute Python code in E2B sandbox with fallback mechanism"""
+    """Execute Python code in E2B sandbox using default template"""
     
     e2b_api_key = os.getenv("E2B_API_KEY")
     if not e2b_api_key:
         raise HTTPException(status_code=500, detail="E2B_API_KEY not configured")
     
-    template_id = os.getenv("E2B_TEMPLATE_ID", "lnmzb0eecin3qojbvl9j")
-    
     start_time = time.time()
     
-    # Use default template with uv for inline dependencies support
-    templates_to_try = [
-        (None, "default template with uv")
-    ]
-    
-    attempted_templates = []
-    
-    for template, description in templates_to_try:
-        try:
-            attempted_templates.append(f"🔄 {description}")
-            print(f"🔄 Trying template: {template} ({description})")
-            if template:
-                with Sandbox(template=template) as sandbox:
-                    # Custom template should have uv pre-installed
-                    enhanced_code = f"""
-print("🎯 Using custom template: {template}")
-print("📍 Template: {description}")
-{request.code}
-"""
-                    result = sandbox.run_code(enhanced_code)
-            else:
-                with Sandbox() as sandbox:
-                    print("🎯 Using default template")
-                    # Install uv in default template if needed
-                    enhanced_code = f"""
-print("🎯 Using default template")
-print("📍 Installing uv if needed...")
+    try:
+        # Always use default template - no custom template dependency
+        with Sandbox() as sandbox:
+            print("🎯 Using default E2B template (clean version)")
+            
+            enhanced_code = f"""
+print("🎯 Default E2B Template - Clean Version")
+print("📦 Auto-installing UV for inline dependencies...")
 
-# Check if uv is available, install if not
 import subprocess
 import sys
 
 try:
-    subprocess.run(["uv", "--version"], check=True, capture_output=True)
-    print("✅ uv is available")
-    uv_available = True
+    result = subprocess.run(["uv", "--version"], check=True, capture_output=True, text=True)
+    print(f"✅ UV already available: {{result.stdout.strip()}}")
 except (subprocess.CalledProcessError, FileNotFoundError):
-    print("📦 Installing uv...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "uv"], check=True)
-    print("✅ uv installed successfully")
-    uv_available = True
+    print("⬇️ Installing UV...")
+    install_result = subprocess.run([sys.executable, "-m", "pip", "install", "uv"], 
+                                   capture_output=True, text=True)
+    if install_result.returncode == 0:
+        print("✅ UV installed successfully")
+    else:
+        print(f"❌ UV installation failed")
 
-# Execute user code
+print("\\n🚀 Executing user code:")
+print("=" * 40)
+
+# User code execution
 {request.code}
 """
-                    result = sandbox.run_code(enhanced_code)
-            
-            execution_time = time.time() - start_time
-            
-            # Process results
-            output_lines = []
-            if result.logs.stdout:
-                output_lines.extend(result.logs.stdout)
-            if result.logs.stderr:
-                output_lines.extend([f"STDERR: {line}" for line in result.logs.stderr])
-            
-            output = "\n".join(output_lines) if output_lines else "Code executed successfully (no output)"
-            
-            # Add template info to output
-            template_info = f" (using {description})"
-            attempt_info = f"\n\n📋 Templates attempted: {' → '.join(attempted_templates)}"
-            
-            return CodeResponse(
-                success=True,
-                output=output + template_info + attempt_info,
-                execution_time=execution_time
-            )
-            
-        except Exception as e:
-            attempted_templates.append(f"❌ {description} (failed: {str(e)[:50]}...)")
-            print(f"❌ Template {template} failed: {str(e)[:100]}...")
-            # If this is not the last template, continue to next
-            if template != templates_to_try[-1][0]:
-                print(f"🔄 Falling back to next template...")
-                continue
-            # If this is the last template, return error
-            execution_time = time.time() - start_time
-            return CodeResponse(
-                success=False,
-                output="",
-                error=f"All templates failed. Last error: {str(e)}",
-                execution_time=execution_time
-            )
+            result = sandbox.run_code(enhanced_code)
+        
+        execution_time = time.time() - start_time
+        
+        # Process results
+        output_lines = []
+        if result.logs.stdout:
+            output_lines.extend(result.logs.stdout)
+        if result.logs.stderr:
+            output_lines.extend([f"STDERR: {line}" for line in result.logs.stderr])
+        
+        output = "\\n".join(output_lines) if output_lines else "Code executed successfully"
+        
+        return CodeResponse(
+            success=True,
+            output=output,
+            execution_time=execution_time
+        )
+        
+    except Exception as e:
+        execution_time = time.time() - start_time
+        return CodeResponse(
+            success=False,
+            output="",
+            error=f"Execution failed: {str(e)}",
+            execution_time=execution_time
+        )
 
 @app.get("/")
 async def root():
-    """Root endpoint with API information"""
+    """Root endpoint"""
     return {
-        "service": "E2B Code Execution API",
+        "service": "E2B Code Execution API - Clean Version",
+        "version": "2.0.0", 
+        "template": "default only",
+        "changes": [
+            "Auto UV installation"
+        ],
         "endpoints": {
             "/health": "Health check",
-            "/execute": "Execute Python code (POST)",
-            "/docs": "API documentation"
-        },
-        "template": os.getenv("E2B_TEMPLATE_ID", "genapi")
+            "/execute": "Execute Python code (POST)"
+        }
     }
-
-# ASGI application for App Engine
-from fastapi.middleware.wsgi import WSGIMiddleware
-
-# Create WSGI wrapper for App Engine compatibility
-def create_app():
-    return app
 
 if __name__ == "__main__":
     import uvicorn
