@@ -61,8 +61,23 @@ except (subprocess.CalledProcessError, FileNotFoundError):
 """
             sandbox.run_code(setup_code)
             
-            # Step 2: Execute user code only
-            result = sandbox.run_code(request.code)
+            # Step 2: Check if code contains UV inline dependencies
+            if "# /// script" in request.code and "# dependencies" in request.code:
+                # Use uv run for scripts with inline dependencies
+                script_content = request.code
+                
+                # Write script to temporary file
+                write_script = f"""
+with open('/tmp/script.py', 'w') as f:
+    f.write('''{script_content}''')
+"""
+                sandbox.run_code(write_script)
+                
+                # Execute with uv run
+                result = sandbox.run_code("import subprocess; result = subprocess.run(['uv', 'run', '/tmp/script.py'], capture_output=True, text=True); print(result.stdout); print(result.stderr)")
+            else:
+                # Execute code directly for simple scripts
+                result = sandbox.run_code(request.code)
         
         execution_time = time.time() - start_time
         
