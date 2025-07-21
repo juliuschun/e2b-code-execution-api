@@ -51,28 +51,17 @@ def execute_code(request: CodeRequest):
             print("🎯 Using default E2B template (clean version)")
             
             enhanced_code = f"""
-print("🎯 Default E2B Template - Clean Version")
-print("📦 Auto-installing UV for inline dependencies...")
-
+# Silently install UV if needed
 import subprocess
 import sys
 
 try:
-    result = subprocess.run(["uv", "--version"], check=True, capture_output=True, text=True)
-    print(f"✅ UV already available: {{result.stdout.strip()}}")
+    subprocess.run(["uv", "--version"], check=True, capture_output=True)
 except (subprocess.CalledProcessError, FileNotFoundError):
-    print("⬇️ Installing UV...")
-    install_result = subprocess.run([sys.executable, "-m", "pip", "install", "uv"], 
-                                   capture_output=True, text=True)
-    if install_result.returncode == 0:
-        print("✅ UV installed successfully")
-    else:
-        print(f"❌ UV installation failed")
+    subprocess.run([sys.executable, "-m", "pip", "install", "uv"], 
+                   capture_output=True, text=True)
 
-print("\\n🚀 Executing user code:")
-print("=" * 40)
-
-# User code execution
+# Execute user code
 {request.code}
 """
             result = sandbox.run_code(enhanced_code)
