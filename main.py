@@ -48,10 +48,8 @@ def execute_code(request: CodeRequest):
     try:
         # Always use default template - no custom template dependency
         with Sandbox() as sandbox:
-            print("🎯 Using default E2B template (clean version)")
-            
-            enhanced_code = f"""
-# Silently install UV if needed
+            # Step 1: Silently install UV if needed
+            setup_code = """
 import subprocess
 import sys
 
@@ -60,22 +58,34 @@ try:
 except (subprocess.CalledProcessError, FileNotFoundError):
     subprocess.run([sys.executable, "-m", "pip", "install", "uv"], 
                    capture_output=True, text=True)
-
-# Execute user code
-{request.code}
 """
-            result = sandbox.run_code(enhanced_code)
+            sandbox.run_code(setup_code)
+            
+            # Step 2: Execute user code only
+            result = sandbox.run_code(request.code)
         
         execution_time = time.time() - start_time
         
-        # Process results
-        output_lines = []
-        if result.logs.stdout:
-            output_lines.extend(result.logs.stdout)
-        if result.logs.stderr:
-            output_lines.extend([f"STDERR: {line}" for line in result.logs.stderr])
+        # Process results - handle both stdout string and list formats
+        output_parts = []
         
-        output = "\\n".join(output_lines) if output_lines else "Code executed successfully"
+        # Handle stdout
+        if hasattr(result.logs, 'stdout') and result.logs.stdout:
+            if isinstance(result.logs.stdout, list):
+                output_parts.extend(result.logs.stdout)
+            else:
+                output_parts.append(result.logs.stdout)
+        
+        # Handle stderr  
+        if hasattr(result.logs, 'stderr') and result.logs.stderr:
+            stderr_lines = result.logs.stderr if isinstance(result.logs.stderr, list) else [result.logs.stderr]
+            output_parts.extend([f"STDERR: {line}" for line in stderr_lines])
+        
+        # Also check for text output directly on result
+        if hasattr(result, 'text') and result.text:
+            output_parts.append(result.text)
+            
+        output = "\\n".join(output_parts) if output_parts else "No output generated"
         
         return CodeResponse(
             success=True,
