@@ -66,10 +66,14 @@ except (subprocess.CalledProcessError, FileNotFoundError):
                 # Use uv run for scripts with inline dependencies
                 script_content = request.code
                 
-                # Write script to temporary file
+                # Write script to temporary file using base64 encoding to avoid quote issues
+                import base64
+                encoded_content = base64.b64encode(script_content.encode('utf-8')).decode('utf-8')
                 write_script = f"""
+import base64
+content = base64.b64decode('{encoded_content}').decode('utf-8')
 with open('/tmp/script.py', 'w') as f:
-    f.write('''{script_content}''')
+    f.write(content)
 """
                 sandbox.run_code(write_script)
                 
